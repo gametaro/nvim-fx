@@ -3,8 +3,8 @@ local M = {}
 M.decorators = {}
 
 local ns = vim.api.nvim_create_namespace('fx')
-local bufs = {}
-local path_type = {}
+local bufs = {} ---@type table<integer, boolean>
+local path_type = {} ---@type table<string, string>
 
 ---@param path string
 ---@return string[]
@@ -133,6 +133,7 @@ function M.attach(buf)
       on_detach = function(_, _buf)
         vim.api.nvim_buf_clear_namespace(_buf, ns, 0, -1)
         bufs[_buf] = false
+        path_type = {}
       end,
     })
   end
