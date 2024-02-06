@@ -5,12 +5,10 @@ local group = vim.api.nvim_create_augroup('fx', {})
 vim.api.nvim_create_autocmd('BufWinEnter', {
   group = group,
   callback = function(a)
-    local path = a.file
+    --- @type integer?
     local buf = a.buf
-    if vim.api.nvim_buf_is_valid(buf) and vim.fn.isdirectory(path) == 1 then
-      fx.attach(buf)
-      fx.render(buf)
-    end
+    fx.attach(buf)
+    fx.render(buf)
   end,
 })
 

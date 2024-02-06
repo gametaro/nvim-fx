@@ -1,6 +1,6 @@
 local M = {}
 --- @type table<string, fun(buf: integer, file: string, line: integer)>
-M.decorators = {}
+M.decors = {}
 
 local ns = vim.api.nvim_create_namespace('fx')
 local bufs = {} ---@type table<integer, boolean>
@@ -19,7 +19,7 @@ local function list(path)
     :totable()
 end
 
-function M.decorators.conceal(buf, file, line)
+function M.decors.conceal(buf, file, line)
   ---@type vim.api.keyset.set_extmark
   local opts = { hl_mode = 'combine', conceal = '' }
 
@@ -31,7 +31,7 @@ function M.decorators.conceal(buf, file, line)
   vim.api.nvim_buf_set_extmark(buf, ns, line, 0, opts)
 end
 
-function M.decorators.highlight(buf, file, line)
+function M.decors.highlight(buf, file, line)
   ---@type vim.api.keyset.set_extmark
   local opts = { end_col = #file, hl_mode = 'combine' }
 
@@ -50,7 +50,7 @@ function M.decorators.highlight(buf, file, line)
   vim.api.nvim_buf_set_extmark(buf, ns, line, 0, opts)
 end
 
-function M.decorators.indicator(buf, file, line)
+function M.decors.indicator(buf, file, line)
   ---@type vim.api.keyset.set_extmark
   local opts = { end_col = #file - 1, hl_mode = 'combine', virt_text_pos = 'inline' }
 
@@ -101,8 +101,17 @@ function M.sort(files, f)
   end
 end
 
----@param buf integer
+---@param buf integer?
+function M.ensure(buf)
+  if buf == nil or buf == 0 then buf = vim.api.nvim_get_current_buf() end
+  return vim.bo[buf].buftype == ''
+    and vim.bo[buf].modifiable
+    and vim.fn.isdirectory(vim.api.nvim_buf_get_name(buf)) == 1
+end
+
+---@param buf? integer
 function M.render(buf)
+  if not M.ensure(buf) then return end
   local path = vim.api.nvim_buf_get_name(buf)
   local files = list(path)
   files = M.filter(files)
@@ -116,27 +125,29 @@ end
 ---@param line integer
 function M.on_change(buf, line)
   local file = vim.api.nvim_buf_get_lines(buf, line, line + 1, false)[1]
-  vim.iter(M.decorators):each(function(_, decorator) decorator(buf, file, line) end)
+  vim.iter(M.decors):each(function(_, decor) decor(buf, file, line) end)
 end
 
----@param buf integer
+---@param buf? integer
 function M.attach(buf)
-  if not bufs[buf] then
-    bufs[buf] = vim.api.nvim_buf_attach(buf, false, {
-      on_lines = function(_, _buf, _, first, last_old, last_new)
-        local last = math.max(last_old, last_new)
-        for line = first, last - 1 do
-          M.on_change(_buf, line)
-        end
-      end,
-      on_reload = function(_, _buf) vim.api.nvim_buf_clear_namespace(_buf, ns, 0, -1) end,
-      on_detach = function(_, _buf)
-        vim.api.nvim_buf_clear_namespace(_buf, ns, 0, -1)
-        bufs[_buf] = false
-        path_type = {}
-      end,
-    })
-  end
+  if not M.ensure(buf) or bufs[buf] then return end
+  bufs[buf] = vim.api.nvim_buf_attach(buf, false, {
+    on_lines = function(_, _buf, _, first, last_old, last_new)
+      local last = math.max(last_old, last_new)
+      for line = first, last - 1 do
+        M.on_change(_buf, line)
+      end
+    end,
+    on_reload = function(_, _buf)
+      vim.api.nvim_buf_clear_namespace(_buf, ns, 0, -1)
+      M.render(_buf)
+    end,
+    on_detach = function(_, _buf)
+      vim.api.nvim_buf_clear_namespace(_buf, ns, 0, -1)
+      bufs[_buf] = false
+      path_type = {}
+    end,
+  })
 end
 
 return M
