@@ -1,14 +1,13 @@
-local fx = require('fx')
-
-local group = vim.api.nvim_create_augroup('fx', {})
-
 vim.api.nvim_create_autocmd('BufWinEnter', {
-  group = group,
+  group = vim.api.nvim_create_augroup('fx', {}),
   callback = function(a)
     --- @type integer?
     local buf = a.buf
-    fx.attach(buf)
-    fx.render(buf)
+    local ok, fx = pcall(require, 'fx')
+    if ok then
+      fx.attach(buf)
+      fx.render(buf)
+    end
   end,
 })
 

@@ -11,6 +11,6 @@ vim.wo[0][0].conceallevel = 2
 vim.wo[0][0].cursorline = true
 vim.wo[0][0].wrap = false
 
-vim.keymap.set('n', '<cr>', 'gf', { buffer = true })
-vim.keymap.set('n', '<c-l>', function() vim.cmd.edit('%:p:h') end, { buffer = true })
+vim.keymap.set('n', '<CR>', 'gf', { buffer = true })
+vim.keymap.set('n', '<C-L>', '<Cmd>nohlsearch<Bar>edit!<Bar>normal! <C-L><CR>')
 vim.keymap.set('n', '-', '<cmd>edit %:p:h:h<cr>', { buffer = true })
