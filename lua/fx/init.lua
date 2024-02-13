@@ -129,19 +129,20 @@ function M.on_lines(_, buf, _, first, last_old, last_new)
   local from = M.clamp(first, min, max)
   local to = M.clamp(last, min, max)
   vim.api.nvim_buf_clear_namespace(buf, M.ns, from, to)
-  vim.iter(vim.api.nvim_buf_get_lines(buf, from, to, true)):enumerate():each(function(line, file)
-    if not file or file == '' then return end
-    vim.iter(M.decors):each(function(_, decor) decor(buf, file, line - 1) end)
-  end)
+  vim
+    .iter(vim.api.nvim_buf_get_lines(buf, from, to, true))
+    :filter(function(file) return file and file ~= '' end)
+    :enumerate()
+    :each(function(line, file)
+      vim.iter(M.decors):each(function(_, decor) decor(buf, file, from + line - 1) end)
+    end)
 end
 
 function M.on_reload()
-  print('reload')
   if not M.bufs[buf] then return true end
 end
 
 function M.on_detach(_, buf)
-  print('detach')
   vim.api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
   M.bufs[buf] = false
   M.path_type = {}
