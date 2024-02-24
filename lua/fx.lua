@@ -1,5 +1,7 @@
 local M = {}
 
+local cwd ---@type string?
+
 M.ns = vim.api.nvim_create_namespace('fx')
 
 M.decors = {} ---@type table<string, fun(buf: integer, file: string, line: integer)>
@@ -13,9 +15,13 @@ end
 ---@param buf? integer
 function M.render(buf)
   buf = M.resolve_buf(buf)
+  local dir = vim.api.nvim_buf_get_name(buf)
+  cwd = vim.fn.getcwd()
+  vim.cmd.lcd({ dir, mods = { noautocmd = true } })
+  vim.api.nvim_buf_set_name(buf, dir)
   local files = vim.iter.map(function(name, _)
     return name
-  end, vim.fs.dir(vim.api.nvim_buf_get_name(buf)))
+  end, vim.fs.dir(dir))
   vim.api.nvim_buf_set_lines(buf, 0, -1, true, #files == 0 and { '..' } or files)
   vim.bo.modified = false
 end
@@ -49,62 +55,60 @@ local type_virttext = {
   unknown = { { '' } },
 }
 
+---@param stat uv.fs_stat.result
+local function is_executable(stat)
+  return require('bit').band(stat.mode, tonumber('111', 8)) ~= 0
+end
+
+---@param stat uv.fs_stat.result
+local function has_stickybit(stat)
+  return require('bit').band(stat.mode, tonumber('1000', 8)) ~= 0
+end
+
+---@param stat uv.fs_stat.result
+local function extra_decors(stat)
+  local hl_group = type_hlgroup[stat.type]
+  local virt_text = type_virttext[stat.type]
+
+  if stat.type == 'file' and is_executable(stat) then
+    hl_group = 'FxExecutable'
+    virt_text = { { '*' } }
+  elseif stat.type == 'directory' and has_stickybit(stat) then
+    hl_group = 'FxStickybit'
+  end
+
+  return hl_group, virt_text
+end
+
 function M.decors.stat(buf, file, line)
-  ---@type vim.api.keyset.set_extmark
   local opts_highlight = { end_col = #file, hl_mode = 'combine' }
-  ---@type vim.api.keyset.set_extmark
   local opts_indicator = { end_col = #file - 1, virt_text_pos = 'inline' }
 
-  local path = vim.fs.joinpath(vim.bo.path, file)
   ---@diagnostic disable-next-line: param-type-mismatch
-  local stat = vim.uv.fs_lstat(path)
-  if stat then
-    local type = stat.type
-    opts_highlight.hl_group = type_hlgroup[type]
-    opts_indicator.virt_text = type_virttext[type]
+  local stat = vim.uv.fs_lstat(file)
+  if not stat then
+    return
+  end
 
-    if type == 'file' then
-      if require('bit').band(stat.mode, tonumber('111', 8)) ~= 0 then
-        opts_indicator.virt_text = { { '*' } }
-        opts_highlight.hl_group = 'FxExecutable'
-      end
-    elseif type == 'directory' then
-      if require('bit').band(stat.mode, tonumber('1000', 8)) ~= 0 then
-        opts_highlight.hl_group = 'FxStickybit'
-      end
-    elseif type == 'link' then
-      -- NOTE: use resolve() since uv.fs_readlink may return relative path
-      local link = vim.fn.resolve(path)
-      if link then
-        local link_indicator ---@type table?
-        local link_hl_group ---@type string?
-        local link_stat = vim.uv.fs_stat(link)
-        if link_stat then
-          link_hl_group = type_hlgroup[link_stat.type]
-          link_indicator = type_virttext[link_stat.type]
-          if link_stat.type == 'file' then
-            if require('bit').band(stat.mode, tonumber('111', 8)) ~= 0 then
-              link_hl_group = 'FxExecutable'
-              link_indicator = { { '*' } }
-            end
-          elseif link_stat.type == 'directory' then
-            if require('bit').band(stat.mode, tonumber('1000', 8)) ~= 0 then
-              link_hl_group = 'FxStickybit'
-            end
-          end
+  opts_highlight.hl_group, opts_indicator.virt_text = extra_decors(stat)
 
-          opts_indicator.virt_text = {
-            { ' -> ', '' },
-            { link, link_hl_group },
-            link_indicator[1],
-          }
-        end
+  if stat.type == 'link' then
+    local link = vim.fn.resolve(file)
+    if link ~= '' then
+      local link_stat = vim.uv.fs_stat(link)
+      if link_stat then
+        local link_hl_group, link_virt_text = extra_decors(link_stat)
+        opts_indicator.virt_text = {
+          { ' -> ' },
+          { link, link_hl_group },
+          unpack(link_virt_text),
+        }
       end
     end
-
-    vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, opts_indicator)
-    vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, opts_highlight)
   end
+
+  vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, opts_indicator)
+  vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, opts_highlight)
 end
 
 ---@param buf integer?
@@ -160,7 +164,80 @@ function M.attach(buf)
     on_reload = M.on_reload,
     on_detach = M.on_detach,
   })
-  vim.bo[buf].filetype = 'fx'
+end
+
+function M.setup()
+  local group = vim.api.nvim_create_augroup('fx', {})
+  vim.api.nvim_create_autocmd('FileType', {
+    group = group,
+    pattern = 'fx',
+    callback = function()
+      -- FIXME: don't work
+      -- vim.opt_local.isfname:append('32')
+      vim.bo.bufhidden = 'hide'
+      vim.bo.buflisted = false
+      vim.bo.buftype = 'nofile'
+      vim.bo.swapfile = false
+
+      vim.wo[0][0].concealcursor = 'nc'
+      vim.wo[0][0].conceallevel = 2
+      vim.wo[0][0].cursorline = true
+      vim.wo[0][0].wrap = false
+
+      M.attach()
+    end,
+  })
+
+  vim.api.nvim_create_autocmd({ 'BufWinEnter' }, {
+    group = group,
+    callback = function(a)
+      --- @type integer
+      local buf = a.buf
+      if
+        vim.api.nvim_buf_is_valid(buf)
+        and vim.bo[buf].modifiable
+        and vim.fn.isdirectory(vim.api.nvim_buf_get_name(buf)) == 1
+      then
+        vim.bo[buf].filetype = 'fx'
+        M.render(buf)
+        vim.api.nvim_create_autocmd({ 'BufWinLeave' }, {
+          group = group,
+          buffer = buf,
+          callback = function()
+            vim.cmd.lcd({ cwd, mods = { noautocmd = true } })
+          end,
+        })
+      end
+    end,
+  })
+
+  vim
+    .iter({
+      FxFile = '',
+      FxBlock = 'WarningMsg',
+      FxChar = 'WarningMsg',
+      FxDirectory = 'Directory',
+      FxFifo = 'DiffChange',
+      FxLink = 'Underlined',
+      FxLinkBroken = 'SpellBad',
+      FxSocket = 'Identifier',
+      FxUnknown = 'NonText',
+
+      FxExecutable = 'String',
+      FxStickybit = 'Search',
+    })
+    :each(function(dst, src)
+      local opts = vim.api.nvim_get_hl(0, { name = src })
+      if
+        vim.iter({ 'FxChar', 'FxDirectory', 'FxExecutable' }):any(function(name)
+          return name == dst
+        end)
+      then
+        opts.bold = true
+        opts.default = true
+      end
+      vim.api.nvim_set_hl(0, dst, opts)
+    end)
 end
 
 return M
