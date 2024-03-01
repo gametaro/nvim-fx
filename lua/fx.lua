@@ -40,15 +40,15 @@ local type_hlgroup = {
   unknown = 'FxUnknown',
 }
 
-local type_virttext = {
-  block = { { '' } },
-  char = { { '' } },
-  directory = { { '/' } },
-  fifo = { { '|' } },
-  file = { { '' } },
-  link = { { '@' } },
-  socket = { { '=' } },
-  unknown = { { '' } },
+local type_indicator = {
+  block = '#',
+  char = '%',
+  directory = '/',
+  fifo = '|',
+  file = '',
+  link = '@',
+  socket = '=',
+  unknown = '',
 }
 
 ---@param stat uv.fs_stat.result
@@ -65,7 +65,7 @@ end
 ---@param path string
 local function extra_decors(stat, path)
   local hl_group = type_hlgroup[stat.type]
-  local virt_text = type_virttext[stat.type]
+  local virt_text = { { type_indicator[stat.type] } }
 
   if stat.type == 'file' and is_executable(stat) then
     hl_group = 'FxExecutable'
@@ -80,6 +80,7 @@ local function extra_decors(stat, path)
       if link_stat then
         local link_hl_group, link_virt_text = extra_decors(link_stat, path)
         virt_text = {
+          { type_indicator[stat.type] },
           { ' -> ' },
           { link, link_hl_group },
           unpack(link_virt_text),
@@ -88,6 +89,7 @@ local function extra_decors(stat, path)
     else
       hl_group = 'FxLinkBroken'
       virt_text = {
+        { type_indicator[stat.type] },
         { ' -> ' },
         { link, 'FxLinkBroken' },
       }
