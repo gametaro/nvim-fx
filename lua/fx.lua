@@ -132,7 +132,10 @@ function M.decorate(buf, first, last)
     :enumerate()
     :each(function(line, file)
       vim.iter(M.decors):each(function(_, decor)
-        decor(buf, file, start + line - 1)
+        -- NOTE: cannot use Iter:filter() due to loss of index information
+        if file and file ~= '' then
+          decor(buf, file, start + line - 1)
+        end
       end)
     end)
 end
