@@ -73,19 +73,16 @@ local function extra_decors(stat, path)
   elseif stat.type == 'directory' and has_stickybit(stat) then
     hl_group = 'FxStickybit'
   elseif stat.type == 'link' then
-    local _stat = vim.uv.fs_stat(path)
+    local link_stat = vim.uv.fs_stat(path)
     local link = vim.fn.resolve(path)
-    if _stat then
-      local link_stat = vim.uv.fs_stat(link)
-      if link_stat then
-        local link_hl_group, link_virt_text = extra_decors(link_stat, path)
-        virt_text = {
-          { type_indicator[stat.type] },
-          { ' -> ' },
-          { link, link_hl_group },
-          unpack(link_virt_text),
-        }
-      end
+    if link_stat then
+      local link_hl_group, link_virt_text = extra_decors(link_stat, path)
+      virt_text = {
+        { type_indicator[stat.type] },
+        { ' -> ' },
+        { link, link_hl_group },
+        unpack(link_virt_text),
+      }
     else
       hl_group = 'FxLinkBroken'
       virt_text = {
