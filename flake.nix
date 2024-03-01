@@ -43,7 +43,7 @@
               actionlint.enable = true;
               alejandra.enable = true;
               editorconfig-checker.enable = true;
-              lua-ls.enable = false;
+              lua-ls.enable = true;
               nil.enable = true;
               statix.enable = true;
               stylua.enable = true;
