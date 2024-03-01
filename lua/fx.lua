@@ -1,7 +1,5 @@
 local M = {}
 
-local cwd ---@type string?
-
 M.ns = vim.api.nvim_create_namespace('fx')
 
 M.decors = {} ---@type table<string, fun(buf: integer, file: string, line: integer)>
@@ -15,13 +13,11 @@ end
 ---@param buf? integer
 function M.render(buf)
   buf = M.resolve_buf(buf)
-  local dir = vim.api.nvim_buf_get_name(buf)
-  cwd = vim.fn.getcwd()
-  vim.cmd.lcd({ dir, mods = { noautocmd = true } })
-  vim.api.nvim_buf_set_name(buf, dir)
-  local files = vim.iter.map(function(name, _)
+  local path = vim.api.nvim_buf_get_name(buf)
+  vim.api.nvim_buf_set_name(buf, path)
+  local files = vim.iter.map(function(name)
     return name
-  end, vim.fs.dir(dir))
+  end, vim.fs.dir(path))
   vim.api.nvim_buf_set_lines(buf, 0, -1, true, #files == 0 and { '..' } or files)
   vim.bo.modified = false
 end
@@ -81,11 +77,14 @@ local function extra_decors(stat)
 end
 
 function M.decors.stat(buf, file, line)
+  ---@type vim.api.keyset.set_extmark
   local opts_highlight = { end_col = #file, hl_mode = 'combine' }
+  ---@type vim.api.keyset.set_extmark
   local opts_indicator = { end_col = #file - 1, virt_text_pos = 'inline' }
 
+  local path = vim.fs.joinpath(vim.api.nvim_buf_get_name(0), file)
   ---@diagnostic disable-next-line: param-type-mismatch
-  local stat = vim.uv.fs_lstat(file)
+  local stat = vim.uv.fs_lstat(path)
   if not stat then
     return
   end
@@ -93,7 +92,7 @@ function M.decors.stat(buf, file, line)
   opts_highlight.hl_group, opts_indicator.virt_text = extra_decors(stat)
 
   if stat.type == 'link' then
-    local link = vim.fn.resolve(file)
+    local link = vim.fn.resolve(path)
     if link ~= '' then
       local link_stat = vim.uv.fs_stat(link)
       if link_stat then
@@ -111,6 +110,12 @@ function M.decors.stat(buf, file, line)
   vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, opts_highlight)
 end
 
+---@param file string
+---@return string
+function M.sanitize(file)
+  return vim.trim(file)
+end
+
 ---@param buf integer?
 ---@param first integer?
 ---@param last integer?
@@ -123,9 +128,7 @@ function M.decorate(buf, first, last)
   vim.api.nvim_buf_clear_namespace(buf, M.ns, start, end_)
   vim
     .iter(vim.api.nvim_buf_get_lines(buf, start, end_, true))
-    :filter(function(file)
-      return file and file ~= ''
-    end)
+    :map(M.sanitize)
     :enumerate()
     :each(function(line, file)
       vim.iter(M.decors):each(function(_, decor)
@@ -178,6 +181,10 @@ function M.setup()
       vim.bo.buflisted = false
       vim.bo.buftype = 'nofile'
       vim.bo.swapfile = false
+      local name = vim.api.nvim_buf_get_name(0)
+      if vim.fn.isdirectory(name) == 1 then
+        vim.opt_local.path:prepend(name)
+      end
 
       vim.wo[0][0].concealcursor = 'nc'
       vim.wo[0][0].conceallevel = 2
@@ -188,7 +195,7 @@ function M.setup()
     end,
   })
 
-  vim.api.nvim_create_autocmd({ 'BufWinEnter' }, {
+  vim.api.nvim_create_autocmd({ 'BufEnter' }, {
     group = group,
     callback = function(a)
       --- @type integer
@@ -200,13 +207,6 @@ function M.setup()
       then
         vim.bo[buf].filetype = 'fx'
         M.render(buf)
-        vim.api.nvim_create_autocmd({ 'BufWinLeave' }, {
-          group = group,
-          buffer = buf,
-          callback = function()
-            vim.cmd.lcd({ cwd, mods = { noautocmd = true } })
-          end,
-        })
       end
     end,
   })
@@ -214,17 +214,17 @@ function M.setup()
   vim
     .iter({
       FxFile = '',
-      FxBlock = 'WarningMsg',
+      FxBlock = 'CurSearch',
       FxChar = 'WarningMsg',
       FxDirectory = 'Directory',
-      FxFifo = 'DiffChange',
+      FxFifo = 'Visual',
       FxLink = 'Underlined',
       FxLinkBroken = 'SpellBad',
       FxSocket = 'Identifier',
       FxUnknown = 'NonText',
 
       FxExecutable = 'String',
-      FxStickybit = 'Search',
+      FxStickybit = 'DiffAdd',
     })
     :each(function(dst, src)
       local opts = vim.api.nvim_get_hl(0, { name = src })
@@ -234,8 +234,8 @@ function M.setup()
         end)
       then
         opts.bold = true
-        opts.default = true
       end
+      opts.default = true
       vim.api.nvim_set_hl(0, dst, opts)
     end)
 end
