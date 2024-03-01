@@ -228,7 +228,7 @@ function M.setup()
       FxDirectory = 'Directory',
       FxFifo = 'Visual',
       FxLink = 'Underlined',
-      FxLinkBroken = 'Error',
+      FxLinkBroken = 'ErrorMsg',
       FxSocket = 'Identifier',
       FxUnknown = 'NonText',
 
@@ -237,14 +237,10 @@ function M.setup()
     })
     :each(function(dst, src)
       local opts = vim.api.nvim_get_hl(0, { name = src })
-      if
-        vim.iter({ 'FxChar', 'FxDirectory', 'FxExecutable' }):any(function(name)
-          return name == dst
-        end)
-      then
+      opts.default = true
+      if dst ~= 'FxFile' then
         opts.bold = true
       end
-      opts.default = true
       vim.api.nvim_set_hl(0, dst, opts)
     end)
 end
