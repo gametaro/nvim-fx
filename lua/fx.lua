@@ -62,7 +62,8 @@ local function has_stickybit(stat)
 end
 
 ---@param stat uv.fs_stat.result
-local function extra_decors(stat)
+---@param path string
+local function extra_decors(stat, path)
   local hl_group = type_hlgroup[stat.type]
   local virt_text = type_virttext[stat.type]
 
@@ -71,6 +72,26 @@ local function extra_decors(stat)
     virt_text = { { '*' } }
   elseif stat.type == 'directory' and has_stickybit(stat) then
     hl_group = 'FxStickybit'
+  elseif stat.type == 'link' then
+    local _stat = vim.uv.fs_stat(path)
+    local link = vim.fn.resolve(path)
+    if _stat then
+      local link_stat = vim.uv.fs_stat(link)
+      if link_stat then
+        local link_hl_group, link_virt_text = extra_decors(link_stat, path)
+        virt_text = {
+          { ' -> ' },
+          { link, link_hl_group },
+          unpack(link_virt_text),
+        }
+      end
+    else
+      hl_group = 'FxLinkBroken'
+      virt_text = {
+        { ' -> ' },
+        { link, 'FxLinkBroken' },
+      }
+    end
   end
 
   return hl_group, virt_text
@@ -89,27 +110,7 @@ function M.decors.stat(buf, file, line)
     return
   end
 
-  opts_highlight.hl_group, opts_indicator.virt_text = extra_decors(stat)
-
-  if stat.type == 'link' then
-    local link = vim.fn.resolve(path)
-    if link == '' then
-      opts_indicator.virt_text = {
-        { ' -> ' },
-        { '?', 'FxLinkBroken' },
-      }
-    else
-      local link_stat = vim.uv.fs_stat(link)
-      if link_stat then
-        local link_hl_group, link_virt_text = extra_decors(link_stat)
-        opts_indicator.virt_text = {
-          { ' -> ' },
-          { link, link_hl_group },
-          unpack(link_virt_text),
-        }
-      end
-    end
-  end
+  opts_highlight.hl_group, opts_indicator.virt_text = extra_decors(stat, path)
 
   vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, opts_indicator)
   vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, opts_highlight)
