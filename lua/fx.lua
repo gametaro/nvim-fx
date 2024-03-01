@@ -93,7 +93,12 @@ function M.decors.stat(buf, file, line)
 
   if stat.type == 'link' then
     local link = vim.fn.resolve(path)
-    if link ~= '' then
+    if link == '' then
+      opts_indicator.virt_text = {
+        { ' -> ' },
+        { '?', 'FxLinkBroken' },
+      }
+    else
       local link_stat = vim.uv.fs_stat(link)
       if link_stat then
         local link_hl_group, link_virt_text = extra_decors(link_stat)
@@ -222,7 +227,7 @@ function M.setup()
       FxDirectory = 'Directory',
       FxFifo = 'Visual',
       FxLink = 'Underlined',
-      FxLinkBroken = 'SpellBad',
+      FxLinkBroken = 'Error',
       FxSocket = 'Identifier',
       FxUnknown = 'NonText',
 
