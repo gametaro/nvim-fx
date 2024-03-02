@@ -176,6 +176,33 @@ function M.attach(buf)
   })
 end
 
+local function set_hl()
+  local highlights = {
+    FxFile = '',
+    FxBlock = 'CurSearch',
+    FxChar = 'WarningMsg',
+    FxDirectory = 'Directory',
+    FxFifo = 'Visual',
+    FxLink = 'Underlined',
+    FxLinkBroken = 'ErrorMsg',
+    FxSocket = 'Identifier',
+    FxUnknown = 'NonText',
+
+    FxExecutable = 'String',
+    FxStickybit = 'DiffAdd',
+  }
+
+  vim.iter(highlights):each(function(dst, src)
+    local opts = vim.api.nvim_get_hl(0, { name = src })
+    opts.default = true
+    if dst ~= 'FxFile' then
+      opts.bold = true
+    end
+    ---@diagnostic disable-next-line: param-type-mismatch
+    vim.api.nvim_set_hl(0, dst, opts)
+  end)
+end
+
 function M.setup()
   local group = vim.api.nvim_create_augroup('fx', {})
   vim.api.nvim_create_autocmd('FileType', {
@@ -218,30 +245,12 @@ function M.setup()
     end,
   })
 
-  vim
-    .iter({
-      FxFile = '',
-      FxBlock = 'CurSearch',
-      FxChar = 'WarningMsg',
-      FxDirectory = 'Directory',
-      FxFifo = 'Visual',
-      FxLink = 'Underlined',
-      FxLinkBroken = 'ErrorMsg',
-      FxSocket = 'Identifier',
-      FxUnknown = 'NonText',
+  vim.api.nvim_create_autocmd('ColorScheme', {
+    group = group,
+    callback = set_hl,
+  })
 
-      FxExecutable = 'String',
-      FxStickybit = 'DiffAdd',
-    })
-    :each(function(dst, src)
-      local opts = vim.api.nvim_get_hl(0, { name = src })
-      opts.default = true
-      if dst ~= 'FxFile' then
-        opts.bold = true
-      end
-      ---@diagnostic disable-next-line: param-type-mismatch
-      vim.api.nvim_set_hl(0, dst, opts)
-    end)
+  set_hl()
 end
 
 return M
