@@ -207,16 +207,15 @@ function M.setup()
   vim.api.nvim_create_autocmd('FileType', {
     group = group,
     pattern = 'fx',
-    callback = function()
+    callback = function(a)
       -- FIXME: don't work
       -- vim.opt_local.isfname:append('32')
       vim.bo.bufhidden = 'hide'
       vim.bo.buflisted = false
       vim.bo.buftype = 'nofile'
       vim.bo.swapfile = false
-      local name = vim.api.nvim_buf_get_name(0)
-      if vim.fn.isdirectory(name) == 1 then
-        vim.opt_local.path:prepend(name)
+      if vim.fn.isdirectory(a.file) == 1 then
+        vim.opt_local.path:prepend(a.file)
       end
 
       vim.wo[0][0].concealcursor = 'nc'
@@ -228,15 +227,14 @@ function M.setup()
     end,
   })
 
-  vim.api.nvim_create_autocmd({ 'BufEnter' }, {
+  vim.api.nvim_create_autocmd('BufEnter', {
     group = group,
     callback = function(a)
-      --- @type integer
-      local buf = a.buf
+      local buf = a.buf ---@type integer
       if
         vim.api.nvim_buf_is_valid(buf)
         and vim.bo[buf].modifiable
-        and vim.fn.isdirectory(vim.api.nvim_buf_get_name(buf)) == 1
+        and vim.fn.isdirectory(a.file) == 1
       then
         vim.bo[buf].filetype = 'fx'
         M.render(buf)
