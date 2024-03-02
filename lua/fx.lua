@@ -218,8 +218,6 @@ function M.setup()
         vim.opt_local.path:prepend(a.file)
       end
 
-      vim.wo[0][0].concealcursor = 'nc'
-      vim.wo[0][0].conceallevel = 2
       vim.wo[0][0].cursorline = true
       vim.wo[0][0].wrap = false
 
