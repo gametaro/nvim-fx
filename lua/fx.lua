@@ -50,7 +50,7 @@ end
 
 ---@param stat uv.fs_stat.result
 ---@param path string
-local function extra_decors(stat, path)
+local function stat_ext(stat, path)
   local hl_group = type_hlgroup[stat.type]
   local virt_text = { { type_indicator[stat.type] } }
 
@@ -63,7 +63,7 @@ local function extra_decors(stat, path)
     local link_stat = vim.uv.fs_stat(path)
     local link = vim.fn.resolve(path)
     if link_stat then
-      local link_hl_group, link_virt_text = extra_decors(link_stat, path)
+      local link_hl_group, link_virt_text = stat_ext(link_stat, path)
       virt_text = {
         { type_indicator[stat.type] },
         { ' -> ' },
@@ -91,7 +91,7 @@ function M.decors.stat(buf, file, line)
     return
   end
 
-  local hl_group, virt_text = extra_decors(stat, path)
+  local hl_group, virt_text = stat_ext(stat, path)
   vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, {
     end_col = #file - 1,
     virt_text = virt_text,
