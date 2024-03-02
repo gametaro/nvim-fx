@@ -214,8 +214,9 @@ function M.setup()
       vim.bo.buflisted = false
       vim.bo.buftype = 'nofile'
       vim.bo.swapfile = false
-      if vim.fn.isdirectory(a.file) == 1 then
-        vim.opt_local.path:prepend(a.file)
+      local name = vim.api.nvim_buf_get_name(a.buf)
+      if vim.fn.isdirectory(name) == 1 then
+        vim.opt_local.path:prepend(name)
       end
 
       vim.wo[0][0].cursorline = true
