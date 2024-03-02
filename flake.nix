@@ -3,71 +3,62 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts = {
-      url = "github:hercules-ci/flake-parts";
-      inputs.nixpkgs-lib.follows = "nixpkgs";
-    };
-    devshell = {
-      url = "github:numtide/devshell";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    pre-commit-hooks-nix = {
-      url = "github:cachix/pre-commit-hooks.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+
+    devshell.url = "github:numtide/devshell";
+    devshell.inputs.nixpkgs.follows = "nixpkgs";
+
+    pre-commit-hooks-nix.url = "github:cachix/pre-commit-hooks.nix";
+    pre-commit-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} {
-      imports = [
-        inputs.pre-commit-hooks-nix.flakeModule
-        inputs.devshell.flakeModule
-      ];
-
-      systems = [
-        "aarch64-darwin"
-        "aarch64-linux"
-        "x86_64-darwin"
-        "x86_64-linux"
-      ];
-
-      perSystem = {
-        config,
-        inputs',
-        pkgs,
-        ...
-      }: {
-        pre-commit = {
-          settings = {
-            hooks = {
-              actionlint.enable = true;
-              alejandra.enable = true;
-              editorconfig-checker.enable = true;
-              lua-ls.enable = true;
-              nil.enable = true;
-              statix.enable = true;
-              stylua.enable = true;
-              yamllint.enable = true;
-            };
-          };
+  outputs = {
+    self,
+    nixpkgs,
+    ...
+  } @ inputs: let
+    inherit (nixpkgs) lib;
+    systems = ["aarch64-linux" "x86_64-linux"];
+    pkgsFor = lib.genAttrs systems (system:
+      import nixpkgs {
+        inherit system;
+        overlays = [inputs.devshell.overlays.default];
+      });
+    forEachSystem = f: lib.genAttrs systems (system: f pkgsFor.${system});
+  in {
+    formatter = forEachSystem (pkgs: pkgs.alejandra);
+    checks = forEachSystem (pkgs: {
+      pre-commit-hooks = inputs.pre-commit-hooks-nix.lib.${pkgs.system}.run {
+        src = ./.;
+        hooks = {
+          alejandra.enable = true;
+          editorconfig-checker.enable = true;
+          deadnix.enable = true;
+          nil.enable = true;
+          lua-ls.enable = true;
+          statix.enable = true;
+          stylua.enable = true;
         };
-
-        devshells.default = {
-          packages = with pkgs; [
-            actionlint
-            alejandra
-            editorconfig-checker
-            lua-language-server
-            nil
-            statix
-            stylua
-            yaml-language-server
-          ];
-          devshell = {
-            motd = "";
-            startup.pre-commit.text = "${config.pre-commit.installationScript}";
-          };
+        settings = {
+          lua-ls.config = lib.importJSON ./.luarc.json;
+          lua-ls.checklevel = "Error";
         };
       };
-    };
+    });
+    devShells = forEachSystem (
+      pkgs:
+        with pkgs; {
+          default = devshell.mkShell {
+            packages = [
+              alejandra
+              deadnix
+              lua-language-server
+              nil
+              statix
+              stylua
+            ];
+            devshell.startup.pre-commit-hooks.text = "${self.checks.${pkgs.system}.pre-commit-hooks.shellHook}";
+          };
+        }
+    );
+  };
 }
