@@ -1,9 +1,8 @@
-local M = {}
-
-M.ns = vim.api.nvim_create_namespace('fx')
-
-M.decors = {} ---@type table<string, fun(buf: integer, file: string, line: integer)>
-M.bufs = {} ---@type table<integer, boolean>
+local M = {
+  ns = vim.api.nvim_create_namespace('fx'),
+  decors = {}, ---@type table<string, fun(buf: integer, file: string, line: integer)>
+  bufs = {}, ---@type table<integer, boolean>
+}
 
 local type_hlgroup = {
   block = 'FxBlock',
@@ -30,18 +29,6 @@ local type_indicator = {
 ---@param buf integer?
 local function resolve_buf(buf)
   return (buf == nil or buf == 0) and vim.api.nvim_get_current_buf() or buf
-end
-
----@param buf integer?
-function M.render(buf)
-  buf = resolve_buf(buf)
-  local path = vim.api.nvim_buf_get_name(buf)
-  vim.api.nvim_buf_set_name(buf, path)
-  local files = vim.iter.map(function(name)
-    return name
-  end, vim.fs.dir(path))
-  vim.api.nvim_buf_set_lines(buf, 0, -1, true, #files == 0 and { '..' } or files)
-  vim.bo.modified = false
 end
 
 ---@param x integer
@@ -104,14 +91,17 @@ function M.decors.stat(buf, file, line)
     return
   end
 
-  ---@type vim.api.keyset.set_extmark
-  local opts_highlight = { end_col = #file, hl_mode = 'combine' }
-  ---@type vim.api.keyset.set_extmark
-  local opts_indicator = { end_col = #file - 1, virt_text_pos = 'inline' }
-  opts_highlight.hl_group, opts_indicator.virt_text = extra_decors(stat, path)
-
-  vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, opts_indicator)
-  vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, opts_highlight)
+  local hl_group, virt_text = extra_decors(stat, path)
+  vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, {
+    end_col = #file - 1,
+    virt_text = virt_text,
+    virt_text_pos = 'inline',
+  })
+  vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, {
+    end_col = #file,
+    hl_group = hl_group,
+    hl_mode = 'combine',
+  })
 end
 
 ---@param file string
@@ -127,18 +117,18 @@ local function decorate(buf, first, last)
   buf = resolve_buf(buf)
   local min = 0
   local max = vim.api.nvim_buf_line_count(buf)
-  local start = first and clamp(first, min, max) or min
-  local end_ = last and clamp(last, min, max) or max
-  vim.api.nvim_buf_clear_namespace(buf, M.ns, start, end_)
+  first = first and clamp(first, min, max) or min
+  last = last and clamp(last, min, max) or max
+  vim.api.nvim_buf_clear_namespace(buf, M.ns, first, last)
   vim
-    .iter(vim.api.nvim_buf_get_lines(buf, start, end_, true))
+    .iter(vim.api.nvim_buf_get_lines(buf, first, last, true))
     :map(sanitize)
     :enumerate()
     :each(function(line, file)
       vim.iter(M.decors):each(function(_, decor)
         -- NOTE: cannot use Iter:filter() due to loss of index information
         if file and file ~= '' then
-          decor(buf, file, start + line - 1)
+          decor(buf, file, first + line - 1)
         end
       end)
     end)
@@ -187,20 +177,29 @@ local function set_hl()
     FxLinkBroken = 'ErrorMsg',
     FxSocket = 'Identifier',
     FxUnknown = 'NonText',
-
     FxExecutable = 'String',
     FxStickybit = 'DiffAdd',
   }
 
   vim.iter(highlights):each(function(dst, src)
     local opts = vim.api.nvim_get_hl(0, { name = src })
+    opts.bold = dst ~= 'FxFile'
     opts.default = true
-    if dst ~= 'FxFile' then
-      opts.bold = true
-    end
     ---@diagnostic disable-next-line: param-type-mismatch
     vim.api.nvim_set_hl(0, dst, opts)
   end)
+end
+
+---@param buf integer?
+function M.render(buf)
+  buf = resolve_buf(buf)
+  local path = vim.api.nvim_buf_get_name(buf)
+  vim.api.nvim_buf_set_name(buf, path)
+  local files = vim.iter.map(function(name)
+    return name
+  end, vim.fs.dir(path))
+  vim.api.nvim_buf_set_lines(buf, 0, -1, true, #files == 0 and { '..' } or files)
+  vim.bo.modified = false
 end
 
 function M.setup()
