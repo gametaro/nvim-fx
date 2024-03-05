@@ -207,17 +207,11 @@ function M.setup()
   vim.api.nvim_create_autocmd('FileType', {
     group = group,
     pattern = 'fx',
-    callback = function(a)
-      -- FIXME: don't work
-      -- vim.opt_local.isfname:append('32')
+    callback = function()
       vim.bo.bufhidden = 'hide'
       vim.bo.buflisted = false
       vim.bo.buftype = 'nofile'
       vim.bo.swapfile = false
-      local name = vim.api.nvim_buf_get_name(a.buf)
-      if vim.fn.isdirectory(name) == 1 then
-        vim.opt_local.path:prepend(name)
-      end
 
       vim.wo[0][0].cursorline = true
       vim.wo[0][0].wrap = false
