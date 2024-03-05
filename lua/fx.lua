@@ -23,7 +23,7 @@ local type_indicator = {
   file = '',
   link = '@',
   socket = '=',
-  unknown = '',
+  unknown = '?',
 }
 
 ---@param buf integer?
@@ -48,11 +48,15 @@ local function has_stickybit(stat)
   return require('bit').band(stat.mode, tonumber('1000', 8)) ~= 0
 end
 
----@param stat uv.fs_stat.result
+---@param stat uv.fs_stat.result?
 ---@param path string
 local function stat_ext(stat, path)
-  local hl_group = type_hlgroup[stat.type]
-  local virt_text = { { type_indicator[stat.type] } }
+  if not stat then
+    return 'FxUnknown', { { '?', 'FxUnknown' } }
+  end
+
+  local hl_group = type_hlgroup[stat.type] or 'FxUnknown'
+  local virt_text = { { type_indicator[stat.type] or '?' } }
 
   if stat.type == 'file' and is_executable(stat) then
     hl_group = 'FxExecutable'
@@ -87,9 +91,6 @@ function M.decors.stat(buf, file, line)
   local path = vim.fs.joinpath(vim.api.nvim_buf_get_name(0), file)
   ---@diagnostic disable-next-line: param-type-mismatch
   local stat = vim.uv.fs_lstat(path)
-  if not stat then
-    return
-  end
 
   local hl_group, virt_text = stat_ext(stat, path)
   vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, {
