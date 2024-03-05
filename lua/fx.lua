@@ -182,13 +182,22 @@ local function set_hl()
     FxStickybit = 'DiffAdd',
   }
 
-  vim.iter(highlights):each(function(dst, src)
-    local opts = vim.api.nvim_get_hl(0, { name = src })
-    opts.bold = dst ~= 'FxFile'
-    opts.default = true
-    ---@diagnostic disable-next-line: param-type-mismatch
-    vim.api.nvim_set_hl(0, dst, opts)
-  end)
+  ---@param dst string
+  ---@param src string
+  local function inherit(dst, src)
+    local highlight = vim.api.nvim_get_hl(0, { name = src })
+    highlight.bold = dst ~= 'FxFile'
+    highlight.default = true
+    return dst, highlight
+  end
+
+  ---@param name string
+  ---@param highlight vim.api.keyset.highlight
+  local function hi(name, highlight)
+    return vim.api.nvim_set_hl(0, name, highlight)
+  end
+
+  vim.iter(highlights):map(inherit):each(hi)
 end
 
 ---@param buf integer?
