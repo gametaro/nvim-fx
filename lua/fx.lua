@@ -205,9 +205,12 @@ function M.render(buf)
   buf = resolve_buf(buf)
   local path = vim.api.nvim_buf_get_name(buf)
   vim.api.nvim_buf_set_name(buf, path)
-  local files = vim.iter.map(function(name)
-    return name
-  end, vim.fs.dir(path))
+  local files = vim
+    .iter(vim.fs.dir(path))
+    :map(function(name)
+      return name
+    end)
+    :totable()
   vim.api.nvim_buf_set_lines(buf, 0, -1, true, #files == 0 and { '..' } or files)
   vim.bo.modified = false
 end
