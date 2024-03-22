@@ -80,9 +80,8 @@ local function get_file_hl_group(stat)
   return hl_group
 end
 
----@param stat uv.fs_stat.result
 ---@param path string
-local function get_link_indicator_and_hl(stat, path)
+local function get_link_indicator_and_hl(path)
   local link_stat = vim.uv.fs_stat(path)
   local link = vim.fn.resolve(path)
 
@@ -91,7 +90,7 @@ local function get_link_indicator_and_hl(stat, path)
     local link_hl_group = get_file_hl_group(link_stat)
     return 'FxLink',
       {
-        { type_indicator[stat.type] },
+        { type_indicator.link },
         { ' -> ' },
         { link, link_hl_group },
         { link_indicator, link_hl_group },
@@ -99,7 +98,7 @@ local function get_link_indicator_and_hl(stat, path)
   else
     return 'FxLinkBroken',
       {
-        { type_indicator[stat.type] },
+        { type_indicator.link },
         { ' -> ' },
         { link, 'FxLinkBroken' },
       }
@@ -110,7 +109,7 @@ end
 ---@param path string
 local function stat_ext(stat, path)
   if stat and stat.type == 'link' then
-    return get_link_indicator_and_hl(stat, path)
+    return get_link_indicator_and_hl(path)
   end
 
   local indicator = get_file_indicator(stat)
