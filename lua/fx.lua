@@ -1,6 +1,6 @@
 local M = {
   ns = vim.api.nvim_create_namespace('fx'),
-  decors = {}, ---@type table<string, fun(buf: integer, file: string, line: integer)>
+  decors = {}, ---@type table<string, fun(buf: integer, file: string, line: integer, opts?: table)>
   bufs = {}, ---@type table<integer, boolean>
 }
 
@@ -49,60 +49,95 @@ local function has_stickybit(stat)
 end
 
 ---@param stat? uv.fs_stat.result
----@param path string
-local function stat_ext(stat, path)
+local function get_file_indicator(stat)
   if not stat then
-    return 'FxUnknown', { { '?', 'FxUnknown' } }
+    return '?'
+  end
+
+  local indicator = type_indicator[stat.type] or '?'
+
+  if stat.type == 'file' and is_executable(stat) then
+    return '*'
+  end
+
+  return indicator
+end
+
+---@param stat? uv.fs_stat.result
+local function get_file_hl_group(stat)
+  if not stat then
+    return 'FxUnknown'
   end
 
   local hl_group = type_hlgroup[stat.type] or 'FxUnknown'
-  local virt_text = { { type_indicator[stat.type] or '?' } }
 
   if stat.type == 'file' and is_executable(stat) then
-    hl_group = 'FxExecutable'
-    virt_text = { { '*' } }
+    return 'FxExecutable'
   elseif stat.type == 'directory' and has_stickybit(stat) then
-    hl_group = 'FxStickybit'
-  elseif stat.type == 'link' then
-    local link_stat = vim.uv.fs_stat(path)
-    local link = vim.fn.resolve(path)
-    if link_stat then
-      local link_hl_group, link_virt_text = stat_ext(link_stat, path)
-      virt_text = {
+    return 'FxStickybit'
+  end
+
+  return hl_group
+end
+
+---@param stat uv.fs_stat.result
+---@param path string
+local function get_link_indicator_and_hl(stat, path)
+  local link_stat = vim.uv.fs_stat(path)
+  local link = vim.fn.resolve(path)
+
+  if link_stat then
+    local link_indicator = get_file_indicator(link_stat)
+    local link_hl_group = get_file_hl_group(link_stat)
+    return 'FxLink',
+      {
         { type_indicator[stat.type] },
         { ' -> ' },
         { link, link_hl_group },
-        unpack(link_virt_text),
+        { link_indicator, link_hl_group },
       }
-    else
-      hl_group = 'FxLinkBroken'
-      virt_text = {
+  else
+    return 'FxLinkBroken',
+      {
         { type_indicator[stat.type] },
         { ' -> ' },
         { link, 'FxLinkBroken' },
       }
-    end
   end
-
-  return hl_group, virt_text
 end
 
-function M.decors.stat(buf, file, line)
+---@param stat? uv.fs_stat.result
+---@param path string
+local function stat_ext(stat, path)
+  if stat and stat.type == 'link' then
+    return get_link_indicator_and_hl(stat, path)
+  end
+
+  local indicator = get_file_indicator(stat)
+  local hl_group = get_file_hl_group(stat)
+  return hl_group, { { indicator, hl_group } }
+end
+
+function M.decors.stat(buf, file, line, opts)
   local path = vim.fs.joinpath(vim.api.nvim_buf_get_name(0), file)
   ---@diagnostic disable-next-line: param-type-mismatch
   local stat = vim.uv.fs_lstat(path)
 
   local hl_group, virt_text = stat_ext(stat, path)
-  vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, {
-    end_col = #file - 1,
-    virt_text = virt_text,
-    virt_text_pos = 'inline',
-  })
-  vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, {
-    end_col = #file,
-    hl_group = hl_group,
-    hl_mode = 'combine',
-  })
+  if opts.indicator then
+    vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, {
+      end_col = #file - 1,
+      virt_text = virt_text,
+      virt_text_pos = 'inline',
+    })
+  end
+  if opts.highlight then
+    vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, {
+      end_col = #file,
+      hl_group = hl_group,
+      hl_mode = 'combine',
+    })
+  end
 end
 
 ---@param file string
@@ -121,18 +156,15 @@ local function decorate(buf, first, last)
   first = first and clamp(first, min, max) or min
   last = last and clamp(last, min, max) or max
   vim.api.nvim_buf_clear_namespace(buf, M.ns, first, last)
-  vim
-    .iter(vim.api.nvim_buf_get_lines(buf, first, last, true))
-    :map(sanitize)
-    :enumerate()
-    :each(function(line, file)
-      vim.iter(M.decors):each(function(_, decor)
-        -- NOTE: cannot use Iter:filter() due to loss of index information
-        if file and file ~= '' then
-          decor(buf, file, first + line - 1)
-        end
-      end)
-    end)
+  local lines_files =
+    vim.iter(vim.api.nvim_buf_get_lines(buf, first, last, true)):map(sanitize):enumerate()
+
+  vim.iter(lines_files):each(function(line, file)
+    -- NOTE: cannot use Iter:filter() due to loss of index information
+    if file and file ~= '' then
+      M.decors.stat(buf, file, first + line - 1, { highlight = true, indicator = false })
+    end
+  end)
 end
 
 local function on_lines(_, buf, _, first, last_old, last_new)
