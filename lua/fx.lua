@@ -155,15 +155,16 @@ local function decorate(buf, first, last)
   first = first and clamp(first, min, max) or min
   last = last and clamp(last, min, max) or max
   vim.api.nvim_buf_clear_namespace(buf, M.ns, first, last)
-  local lines_files =
-    vim.iter(vim.api.nvim_buf_get_lines(buf, first, last, true)):map(sanitize):enumerate()
-
-  vim.iter(lines_files):each(function(line, file)
-    -- NOTE: cannot use Iter:filter() due to loss of index information
-    if file and file ~= '' then
-      M.decors.stat(buf, file, first + line - 1, { highlight = true, indicator = false })
-    end
-  end)
+  vim
+    .iter(vim.api.nvim_buf_get_lines(buf, first, last, true))
+    :map(sanitize)
+    :enumerate()
+    :each(function(line, file)
+      -- NOTE: cannot use Iter:filter() due to loss of index information
+      if file and file ~= '' then
+        M.decors.stat(buf, file, first + line - 1, { highlight = true, indicator = false })
+      end
+    end)
 end
 
 local function on_lines(_, buf, _, first, last_old, last_new)
