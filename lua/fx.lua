@@ -140,7 +140,6 @@ function M.decors.stat(buf, file, line, opts)
 end
 
 ---@param file string
----@return string
 local function sanitize(file)
   return vim.trim(file)
 end
