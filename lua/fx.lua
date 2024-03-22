@@ -26,7 +26,7 @@ local type_indicator = {
   unknown = '?',
 }
 
----@param buf integer?
+---@param buf? integer
 local function resolve_buf(buf)
   return (buf == nil or buf == 0) and vim.api.nvim_get_current_buf() or buf
 end
@@ -48,7 +48,7 @@ local function has_stickybit(stat)
   return require('bit').band(stat.mode, tonumber('1000', 8)) ~= 0
 end
 
----@param stat uv.fs_stat.result?
+---@param stat? uv.fs_stat.result
 ---@param path string
 local function stat_ext(stat, path)
   if not stat then
@@ -111,9 +111,9 @@ local function sanitize(file)
   return vim.trim(file)
 end
 
----@param buf integer?
----@param first integer?
----@param last integer?
+---@param buf? integer
+---@param first? integer
+---@param last? integer
 local function decorate(buf, first, last)
   buf = resolve_buf(buf)
   local min = 0
@@ -154,7 +154,7 @@ local function on_detach(_, buf)
   M.bufs[buf] = false
 end
 
----@param buf integer?
+---@param buf? integer
 function M.attach(buf)
   buf = resolve_buf(buf)
   if M.bufs[buf] then
@@ -200,7 +200,7 @@ local function set_hl()
   vim.iter(highlights):map(inherit):each(hi)
 end
 
----@param buf integer?
+---@param buf? integer
 function M.render(buf)
   buf = resolve_buf(buf)
   local path = vim.api.nvim_buf_get_name(buf)
