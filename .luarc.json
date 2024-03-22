@@ -19,6 +19,9 @@
     "groupSeverity": {
       "strong": "Warning",
       "strict": "Warning"
-    }
+    },
+    "disable": [
+      "duplicate-doc-param"
+    ]
   }
 }

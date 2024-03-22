@@ -166,6 +166,12 @@ local function decorate(buf, first, last)
     end)
 end
 
+---@param _ any
+---@param buf integer
+---@param _ any
+---@param first integer
+---@param last_old integer
+---@param last_new integer
 local function on_lines(_, buf, _, first, last_old, last_new)
   if not M.bufs[buf] then
     return true
@@ -174,12 +180,16 @@ local function on_lines(_, buf, _, first, last_old, last_new)
   decorate(buf, first, last)
 end
 
+---@param _ any
+---@param buf integer
 local function on_reload(_, buf)
   if not M.bufs[buf] then
     return true
   end
 end
 
+---@param _ any
+---@param buf integer
 local function on_detach(_, buf)
   vim.api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
   M.bufs[buf] = false
