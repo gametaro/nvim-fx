@@ -55,7 +55,6 @@ local function get_file_indicator(stat)
   end
 
   local indicator = type_indicator[stat.type] or '?'
-
   if stat.type == 'file' and is_executable(stat) then
     return '*'
   end
@@ -82,18 +81,18 @@ end
 
 ---@param path string
 local function get_link_indicator_and_hl(path)
-  local link_stat = vim.uv.fs_stat(path)
+  local stat = vim.uv.fs_stat(path)
   local link = vim.fn.resolve(path)
 
-  if link_stat then
-    local link_indicator = get_file_indicator(link_stat)
-    local link_hl_group = get_file_hl_group(link_stat)
+  if stat then
+    local indicator = get_file_indicator(stat)
+    local hl_group = get_file_hl_group(stat)
     return 'FxLink',
       {
         { type_indicator.link },
         { ' -> ' },
-        { link, link_hl_group },
-        { link_indicator, link_hl_group },
+        { link, hl_group },
+        { indicator, hl_group },
       }
   else
     return 'FxLinkBroken',
