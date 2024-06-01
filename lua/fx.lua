@@ -1,8 +1,8 @@
-local M = {
-  ns = vim.api.nvim_create_namespace('fx'),
-  decors = {}, ---@type table<string, fun(buf: integer, file: string, line: integer, opts?: table)>
-  bufs = {}, ---@type table<integer, boolean>
-}
+local M = {}
+
+local ns = vim.api.nvim_create_namespace('fx')
+local decors = {} ---@type table<string, fun(buf: integer, file: string, line: integer, opts?: table)>
+local bufs = {} ---@type table<integer, boolean>
 
 local type_hlgroup = {
   block = 'FxBlock',
@@ -116,21 +116,21 @@ local function stat_ext(stat, path)
   return hl_group, { { indicator, hl_group } }
 end
 
-function M.decors.stat(buf, file, line, opts)
+function decors.stat(buf, file, line, opts)
   local path = vim.fs.joinpath(vim.api.nvim_buf_get_name(0), file)
   ---@diagnostic disable-next-line: param-type-mismatch
   local stat = vim.uv.fs_lstat(path)
 
   local hl_group, virt_text = stat_ext(stat, path)
   if opts.indicator then
-    vim.api.nvim_buf_set_extmark(buf, M.ns, line, #file, {
+    vim.api.nvim_buf_set_extmark(buf, ns, line, #file, {
       end_col = #file - 1,
       virt_text = virt_text,
       virt_text_pos = 'inline',
     })
   end
   if opts.highlight then
-    vim.api.nvim_buf_set_extmark(buf, M.ns, line, 0, {
+    vim.api.nvim_buf_set_extmark(buf, ns, line, 0, {
       end_col = #file,
       hl_group = hl_group,
       hl_mode = 'combine',
@@ -152,7 +152,7 @@ local function decorate(buf, first, last)
   local max = vim.api.nvim_buf_line_count(buf)
   first = first and clamp(first, min, max) or min
   last = last and clamp(last, min, max) or max
-  vim.api.nvim_buf_clear_namespace(buf, M.ns, first, last)
+  vim.api.nvim_buf_clear_namespace(buf, ns, first, last)
   vim
     .iter(vim.api.nvim_buf_get_lines(buf, first, last, true))
     :map(sanitize)
@@ -160,7 +160,7 @@ local function decorate(buf, first, last)
     :each(function(line, file)
       -- NOTE: cannot use Iter:filter() due to loss of index information
       if file and file ~= '' then
-        M.decors.stat(buf, file, first + line - 1, { highlight = true, indicator = false })
+        decors.stat(buf, file, first + line - 1, { highlight = true, indicator = false })
       end
     end)
 end
@@ -172,7 +172,7 @@ end
 ---@param last_old integer
 ---@param last_new integer
 local function on_lines(_, buf, _, first, last_old, last_new)
-  if not M.bufs[buf] then
+  if not bufs[buf] then
     return true
   end
   local last = math.max(last_old, last_new)
@@ -182,7 +182,7 @@ end
 ---@param _ any
 ---@param buf integer
 local function on_reload(_, buf)
-  if not M.bufs[buf] then
+  if not bufs[buf] then
     return true
   end
 end
@@ -190,54 +190,21 @@ end
 ---@param _ any
 ---@param buf integer
 local function on_detach(_, buf)
-  vim.api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
-  M.bufs[buf] = false
+  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+  bufs[buf] = false
 end
 
 ---@param buf? integer
 function M.attach(buf)
   buf = resolve_buf(buf)
-  if M.bufs[buf] then
+  if bufs[buf] then
     return
   end
-  M.bufs[buf] = vim.api.nvim_buf_attach(buf, false, {
+  bufs[buf] = vim.api.nvim_buf_attach(buf, false, {
     on_lines = on_lines,
     on_reload = on_reload,
     on_detach = on_detach,
   })
-end
-
-local function set_hl()
-  local highlights = {
-    FxFile = '',
-    FxBlock = 'CurSearch',
-    FxChar = 'WarningMsg',
-    FxDirectory = 'Directory',
-    FxFifo = 'Search',
-    FxLink = 'Underlined',
-    FxLinkBroken = 'Error',
-    FxSocket = 'Identifier',
-    FxUnknown = 'NonText',
-    FxExecutable = 'String',
-    FxStickybit = 'DiffAdd',
-  }
-
-  ---@param dst string
-  ---@param src string
-  local function inherit(dst, src)
-    local highlight = vim.api.nvim_get_hl(0, { name = src })
-    highlight.bold = dst ~= 'FxFile'
-    highlight.default = true
-    return dst, highlight
-  end
-
-  ---@param name string
-  ---@param highlight vim.api.keyset.highlight
-  local function hi(name, highlight)
-    return vim.api.nvim_set_hl(0, name, highlight)
-  end
-
-  vim.iter(highlights):map(inherit):each(hi)
 end
 
 ---@param buf? integer
@@ -253,47 +220,6 @@ function M.render(buf)
     :totable()
   vim.api.nvim_buf_set_lines(buf, 0, -1, true, #files == 0 and { '..' } or files)
   vim.bo.modified = false
-end
-
-function M.setup()
-  local group = vim.api.nvim_create_augroup('fx', {})
-  vim.api.nvim_create_autocmd('FileType', {
-    group = group,
-    pattern = 'fx',
-    callback = function()
-      vim.bo.bufhidden = 'hide'
-      vim.bo.buflisted = false
-      vim.bo.buftype = 'nofile'
-      vim.bo.swapfile = false
-
-      vim.wo[0][0].cursorline = true
-      vim.wo[0][0].wrap = false
-
-      M.attach()
-    end,
-  })
-
-  vim.api.nvim_create_autocmd('BufEnter', {
-    group = group,
-    callback = function(a)
-      local buf = a.buf ---@type integer
-      if
-        vim.api.nvim_buf_is_valid(buf)
-        and vim.bo[buf].modifiable
-        and vim.fn.isdirectory(a.file) == 1
-      then
-        vim.bo[buf].filetype = 'fx'
-        M.render(buf)
-      end
-    end,
-  })
-
-  vim.api.nvim_create_autocmd('ColorScheme', {
-    group = group,
-    callback = set_hl,
-  })
-
-  set_hl()
 end
 
 return M
