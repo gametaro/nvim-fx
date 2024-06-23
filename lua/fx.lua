@@ -99,9 +99,9 @@ local function get_link_indicator_and_hl(path)
   end
 end
 
----@param stat? uv.fs_stat.result
 ---@param path string
-local function stat_ext(stat, path)
+---@param stat? uv.fs_stat.result
+local function stat_ext(path, stat)
   if stat and stat.type == 'link' then
     return get_link_indicator_and_hl(path)
   end
@@ -116,7 +116,7 @@ function decors.stat(buf, file, line, opts)
   ---@diagnostic disable-next-line: param-type-mismatch
   local stat = vim.uv.fs_lstat(path)
 
-  local hl_group, virt_text = stat_ext(stat, path)
+  local hl_group, virt_text = stat_ext(path, stat)
   if opts.indicator then
     vim.api.nvim_buf_set_extmark(buf, ns, line, #file, {
       end_col = #file - 1,
@@ -133,11 +133,6 @@ function decors.stat(buf, file, line, opts)
   end
 end
 
----@param file string
-local function sanitize(file)
-  return vim.trim(file)
-end
-
 ---@param buf integer
 ---@param first? integer
 ---@param last? integer
@@ -149,7 +144,7 @@ local function decorate(buf, first, last)
   vim.api.nvim_buf_clear_namespace(buf, ns, first, last)
   vim
     .iter(vim.api.nvim_buf_get_lines(buf, first, last, true))
-    :map(sanitize)
+    :map(vim.trim)
     :enumerate()
     :each(function(line, file)
       -- NOTE: cannot use Iter:filter() due to loss of index information
@@ -159,44 +154,28 @@ local function decorate(buf, first, last)
     end)
 end
 
----@param _ any
----@param buf integer
----@param _ any
----@param first integer
----@param last_old integer
----@param last_new integer
-local function on_lines(_, buf, _, first, last_old, last_new)
-  if not bufs[buf] then
-    return true
-  end
-  local last = math.max(last_old, last_new)
-  decorate(buf, first, last)
-end
-
----@param _ any
----@param buf integer
-local function on_reload(_, buf)
-  if not bufs[buf] then
-    return true
-  end
-end
-
----@param _ any
----@param buf integer
-local function on_detach(_, buf)
-  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
-  bufs[buf] = false
-end
-
 ---@param buf integer
 function M.attach(buf)
   if bufs[buf] then
     return
   end
   bufs[buf] = vim.api.nvim_buf_attach(buf, false, {
-    on_lines = on_lines,
-    on_reload = on_reload,
-    on_detach = on_detach,
+    on_lines = function(_, _buf, _, first, last_old, last_new)
+      if not bufs[_buf] then
+        return true
+      end
+      local last = math.max(last_old, last_new)
+      decorate(_buf, first, last)
+    end,
+    on_reload = function(_, _buf)
+      if not bufs[_buf] then
+        return true
+      end
+    end,
+    on_detach = function(_, _buf)
+      vim.api.nvim_buf_clear_namespace(_buf, ns, 0, -1)
+      bufs[_buf] = false
+    end,
   })
 end
 
