@@ -26,11 +26,6 @@ local type_indicator = {
   unknown = '?',
 }
 
----@param buf? integer
-local function resolve_buf(buf)
-  return (buf == nil or buf == 0) and vim.api.nvim_get_current_buf() or buf
-end
-
 ---@param x integer
 ---@param min integer
 ---@param max integer
@@ -143,11 +138,10 @@ local function sanitize(file)
   return vim.trim(file)
 end
 
----@param buf? integer
+---@param buf integer
 ---@param first? integer
 ---@param last? integer
 local function decorate(buf, first, last)
-  buf = resolve_buf(buf)
   local min = 0
   local max = vim.api.nvim_buf_line_count(buf)
   first = first and clamp(first, min, max) or min
@@ -194,9 +188,8 @@ local function on_detach(_, buf)
   bufs[buf] = false
 end
 
----@param buf? integer
+---@param buf integer
 function M.attach(buf)
-  buf = resolve_buf(buf)
   if bufs[buf] then
     return
   end
@@ -207,9 +200,8 @@ function M.attach(buf)
   })
 end
 
----@param buf? integer
+---@param buf integer
 function M.render(buf)
-  buf = resolve_buf(buf)
   local path = vim.api.nvim_buf_get_name(buf)
   vim.api.nvim_buf_set_name(buf, path)
   local files = vim

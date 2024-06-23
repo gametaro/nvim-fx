@@ -6,4 +6,4 @@ vim.bo.swapfile = false
 vim.wo[0][0].cursorline = true
 vim.wo[0][0].wrap = false
 
-require('fx').attach()
+require('fx').attach(0)
