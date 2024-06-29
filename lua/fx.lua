@@ -156,6 +156,10 @@ end
 
 ---@param buf integer
 function M.attach(buf)
+  vim.validate('buf', buf, 'integer')
+  if buf == 0 then
+    buf = vim.api.nvim_get_current_buf()
+  end
   if bufs[buf] then
     return
   end
@@ -181,6 +185,10 @@ end
 
 ---@param buf integer
 function M.render(buf)
+  vim.validate('buf', buf, 'integer')
+  if buf == 0 then
+    buf = vim.api.nvim_get_current_buf()
+  end
   local path = vim.api.nvim_buf_get_name(buf)
   vim.api.nvim_buf_set_name(buf, path)
   local files = vim
