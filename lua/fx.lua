@@ -156,7 +156,7 @@ end
 
 ---@param buf integer
 function M.attach(buf)
-  vim.validate('buf', buf, 'integer')
+  vim.validate('buf', buf, 'number')
   if buf == 0 then
     buf = vim.api.nvim_get_current_buf()
   end
@@ -185,7 +185,7 @@ end
 
 ---@param buf integer
 function M.render(buf)
-  vim.validate('buf', buf, 'integer')
+  vim.validate('buf', buf, 'number')
   if buf == 0 then
     buf = vim.api.nvim_get_current_buf()
   end
