@@ -1,4 +1,4 @@
-vim.bo.bufhidden = 'hide'
+vim.bo.bufhidden = 'unload'
 vim.bo.buflisted = false
 vim.bo.buftype = 'nofile'
 vim.bo.swapfile = false
