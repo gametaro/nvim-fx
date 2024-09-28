@@ -4,11 +4,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    devshell.url = "github:numtide/devshell";
-    devshell.inputs.nixpkgs.follows = "nixpkgs";
-
-    pre-commit-hooks-nix.url = "github:cachix/pre-commit-hooks.nix";
-    pre-commit-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
+    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
+    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
@@ -18,16 +15,12 @@
   } @ inputs: let
     inherit (nixpkgs) lib;
     systems = ["aarch64-linux" "x86_64-linux"];
-    pkgsFor = lib.genAttrs systems (system:
-      import nixpkgs {
-        inherit system;
-        overlays = [inputs.devshell.overlays.default];
-      });
+    pkgsFor = lib.genAttrs systems (system: import nixpkgs {inherit system;});
     forEachSystem = f: lib.genAttrs systems (system: f pkgsFor.${system});
   in {
     formatter = forEachSystem (pkgs: pkgs.alejandra);
     checks = forEachSystem (pkgs: {
-      pre-commit-hooks = inputs.pre-commit-hooks-nix.lib.${pkgs.system}.run {
+      pre-commit-check = inputs.pre-commit-hooks.lib.${pkgs.system}.run {
         src = ./.;
         hooks = {
           alejandra.enable = true;
@@ -36,7 +29,7 @@
           nil.enable = true;
           lua-ls.enable = true;
           lua-ls.settings = {
-            config = lib.importJSON ./.luarc.json;
+            configuration = lib.importJSON ./.luarc.json;
             checklevel = "Error";
           };
           statix.enable = true;
@@ -45,20 +38,12 @@
       };
     });
     devShells = forEachSystem (
-      pkgs:
-        with pkgs; {
-          default = devshell.mkShell {
-            packages = [
-              alejandra
-              deadnix
-              lua-language-server
-              nil
-              statix
-              stylua
-            ];
-            devshell.startup.pre-commit-hooks.text = "${self.checks.${pkgs.system}.pre-commit-hooks.shellHook}";
-          };
-        }
+      pkgs: {
+        default = pkgs.mkShellNoCC {
+          inherit (self.checks.${pkgs.system}.pre-commit-check) shellHook;
+          buildInputs = self.checks.${pkgs.system}.pre-commit-check.enabledPackages;
+        };
+      }
     );
   };
 }
