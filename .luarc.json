@@ -23,5 +23,8 @@
     "disable": [
       "duplicate-doc-param"
     ]
+  },
+  "format": {
+    "enable": false
   }
 }
