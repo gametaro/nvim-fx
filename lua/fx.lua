@@ -133,6 +133,19 @@ function decors.stat(buf, file, line, opts)
   end
 end
 
+function decors.icon(buf, file, line)
+  local path = vim.fs.joinpath(vim.api.nvim_buf_get_name(0), file)
+  local ok, devicons = pcall(require, 'nvim-web-devicons')
+  if ok then
+    local text, hl_group = '', 'Directory'
+    text, hl_group = devicons.get_icon(path)
+    vim.api.nvim_buf_set_extmark(buf, ns, line, #file, {
+      sign_text = text,
+      sign_hl_group = hl_group,
+    })
+  end
+end
+
 ---@param buf integer
 ---@param first? integer
 ---@param last? integer
@@ -150,6 +163,7 @@ local function decorate(buf, first, last)
       -- NOTE: cannot use Iter:filter() due to loss of index information
       if file and file ~= '' then
         decors.stat(buf, file, first + line - 1, { highlight = true, indicator = false })
+        decors.icon(buf, file, first + line - 1)
       end
     end)
 end
