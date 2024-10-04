@@ -137,8 +137,13 @@ function decors.icon(buf, file, line)
   local path = vim.fs.joinpath(vim.api.nvim_buf_get_name(0), file)
   local ok, devicons = pcall(require, 'nvim-web-devicons')
   if ok then
-    local text, hl_group = '', 'Directory'
-    text, hl_group = devicons.get_icon(path)
+    local text, hl_group = devicons.get_icon(path)
+    if not text then
+      text = ''
+    end
+    if not hl_group then
+      hl_group = 'Directory'
+    end
     vim.api.nvim_buf_set_extmark(buf, ns, line, #file, {
       sign_text = text,
       sign_hl_group = hl_group,
